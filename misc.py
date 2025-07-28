@@ -1,4 +1,5 @@
 
+print("ERROR")
 class Author:
     def __init__(self, name):
         self.name = name
@@ -87,5 +88,3 @@ library.add_book(Book("1984", author1))
 library.add_book(Book("Arsene Lupin Vs. Sherlock Holmes", author2))
 
 library_menu(library)
-
-print("THERE'S NO ERROR HERE!")
