@@ -1,162 +1,234 @@
 # Playwright Python Testing Framework
 
-A modular, pytest-based Playwright framework for testing React applications (or any web apps) in Python. Built-in support for:
+A modular, pytest-based **Playwright (Python)** framework for web UI testing.
 
-* **Page Object Model** (POM) for clean, maintainable test code
-* **Data-driven testing** via JSON fixtures
-* **Visual regression** with baseline snapshots and automatic diffs
-* **Screenshots & videos** on failures for easier debugging
-* **Environment configuration** using `.env` files
-* **Authenticated session reuse** using Playwright's `storageState`
-* **HTML & JUnit reporting** via `pytest-html` and JUnit XML
-* **Optional Allure reporting** for advanced dashboards
-* **CLI & CI integration** with GitHub Actions and GitHub Pages
+This repo is set up so that a new user can:
+1) **Sign up once** on the demo page,  
+2) Automatically **save credentials to `.env`** and the **session to `auth/storage_state.json`**, and  
+3) **Reuse the logged-in session** on every test run — no login code inside tests.
 
 ---
 
-## 🧩 Git Hooks with Husky (Recommended)
+## ✅ What’s Included
 
-Integrating [Husky](https://github.com/typicode/husky) ensures code quality before changes are committed. Although Husky is a Node.js tool, it works great for Python projects too.
+- **Page Object Model (POM)** for clean, maintainable tests  
+- **Signup-first flow** that persists credentials + session  
+- **Global fixtures** via `conftest.py` (one place to manage browser/context/page)  
+- **Sample tests** to verify setup  
+- **HTML/JUnit reports** (via `pytest-html`, JUnit XML)  
+- **CI-friendly** configuration (pytest, reports)  
 
-### 🚀 Setup
-
-1. Initialize Husky in your repo (requires Node.js):
-
-   ```bash
-   npm init -y
-   npm install husky --save-dev
-   npx husky install
-   ```
-
-2. Add the install command to your `package.json`:
-
-   ```json
-   "scripts": {
-     "prepare": "husky install"
-   }
-   ```
-
-3. Create a pre-commit hook to run your tests and linters:
-
-   ```bash
-   npx husky add .husky/pre-commit "pytest tests/ && black --check . && flake8"
-   git add .husky/pre-commit
-   ```
+> Tested against **pytest 8+** and **Playwright 1.45+**.
 
 ---
 
-## 🧰 Getting Started (For Beginners)
+## 🧭 First-Time Setup — Step by Step (with explanations)
 
-If you're new to QA or test automation, follow these steps to get this framework running on your machine.
-
-### ✅ Prerequisites
-
-- Python 3.8 or later installed
-- Git installed
-- Node.js installed (for optional Husky Git hooks)
-- Google Chrome (for web automation visibility)
-
----
-
-### 🪜 Step-by-Step Setup
-
-#### 1. **Clone the Repository**
-
+### 0) Clone the repository
 ```bash
-git clone https://github.com/your-username/your-python-repo.git
-cd your-python-repo
+git clone https://github.com/your-username/playwright_python_framework.git
+cd playwright_python_framework
 ```
+**Why?** You need the project files locally.
 
-#### 2. **Create a Virtual Environment**
+---
 
+### 1) Create & activate a virtual environment
 ```bash
 python -m venv .venv
-source .venv/bin/activate  # For macOS/Linux
-# .\.venv\Scripts\activate  # For Windows
+# macOS/Linux:
+source .venv/bin/activate
+# Windows (PowerShell):
+# .venv\Scripts\Activate.ps1
 ```
+**Why?** Keeps your project’s Python packages isolated from system Python.
 
-#### 3. **Install Python Dependencies**
+---
 
+### 2) Install Python deps and Playwright browsers
 ```bash
 pip install -r requirements.txt
 playwright install
 ```
+**Why?** Installs pytest, Playwright, and helpers. `playwright install` downloads the browser binaries Playwright drives.
 
-#### 4. **Create Your `.env` File**
+---
 
-Copy the example file and edit it:
-
+### 3) Bootstrap the first user (signup → writes `.env` + saves session)
 ```bash
-cp .env.example .env
+python scripts/bootstrap_signup.py --name "Jane Doe" --email "jane@example.com" --password "StrongPass123"
+```
+> macOS tip: If your password contains `!` or `$`, wrap it in **single quotes**: `'StrongPass!23'`.
+
+**What this does:**
+- Opens the demo **Sign Up** page: `https://faruk-hasan.com/automation/signup.html`
+- Fills **username** (`#username`), **email** (`#email`), **password** (`#password`), **confirm password** (`#confirmPassword`)
+- Clicks the **Sign Up** button (role: button, name: “Sign Up”)
+- Writes your credentials to **`.env`**:
+  ```env
+  SIGNUP_NAME=Jane Doe
+  SIGNUP_EMAIL=jane@example.com
+  SIGNUP_PASSWORD=StrongPass123
+  STORAGE_STATE=auth/storage_state.json
+  ```
+- Saves the logged-in session to **`auth/storage_state.json`**
+
+**Why?** From now on, tests start **already authenticated**. No login steps inside tests.
+
+---
+
+### 4) Confirm the bootstrap worked
+Ensure these now exist:
+- `.env` (contains `SIGNUP_NAME`, `SIGNUP_EMAIL`, `SIGNUP_PASSWORD`, `STORAGE_STATE`)
+- `auth/storage_state.json` (a non-empty JSON file)
+
+**Why?** `conftest.py` uses these to build an authenticated Playwright context automatically.
+
+---
+
+### 5) Run the sample test (quick health check)
+```bash
+pytest tests/test_sample.py -vv
+```
+**What this does:** Opens the signup page and asserts the title and required form elements exist.
+
+**Success looks like:**
+```
+collected 1 item
+tests/test_sample.py::test_framework_setup PASSED                                   [100%]
 ```
 
-Update `.env` with your app URL and login credentials:
+---
 
-```env
-BASE_URL=https://your-app.com
-LOGIN_EMAIL=your@email.com
-LOGIN_PASSWORD=yourpassword
+### 6) Run the full test suite
+```bash
+pytest -vv
+```
+**Why?** Verifies the project runs end-to-end under pytest.  
+If you kept the bootstrap test, see the next section to run it only on demand.
+
+---
+
+## 🔁 Running the one-time signup test only when needed (recommended)
+
+If you keep `tests/test_signup_and_save_session.py`, mark it and skip by default so signup only runs when you ask for it:
+
+**`pytest.ini`**
+```ini
+[pytest]
+markers =
+    sample: quick setup verification test
+    bootstrap: one-time signup & session save
+addopts = -m "not bootstrap"
 ```
 
-#### 5. **Generate Login Session (One Time)**
+- Daily runs:
+  ```bash
+  pytest
+  ```
+  (Bootstrap test is excluded.)
+- When you actually need to re-bootstrap:
+  ```bash
+  pytest -m bootstrap -vv
+  ```
 
-This will log in and save a session token to reuse in tests:
+---
 
-```bash
-python utils/save_storage_state.py
+## 🔒 Headless vs. Headed (seeing the browser)
+
+The browser mode is controlled in `conftest.py` within the `browser` fixture.  
+To **watch the browser**, set `headless=False` there:
+
+```python
+browser = p.chromium.launch(headless=False)
 ```
 
-#### 6. **Run the Tests**
+---
+
+## 🔐 Rotating credentials / re-signing up
+
+If login fails or the session is stale, quickly create a new user + session:
 
 ```bash
-pytest
+python scripts/bootstrap_signup.py --force --random-email --name "New User" --password 'NewStrongPass!23'
 ```
 
-#### 7. **View the Test Report**
+**What `--force` does:** deletes old `auth/storage_state.json` and overwrites creds in `.env`.  
 
-Open the HTML report in your browser:
+---
 
+## 📊 Test Reports (HTML)
+
+### One-time setup
 ```bash
-open reports/html/report.html  # Mac
+pip install pytest-html pytest-metadata
+```
+
+### Generate a report (one-off)
+```bash
+pytest -vv --html=reports/html/report.html --self-contained-html
+```
+
+Open the report in your browser:
+```bash
+open reports/html/report.html  # macOS
 start reports\html\report.html  # Windows
 ```
 
----
-
-### 🛠 (Optional) Enable Git Hooks with Husky
-
-Husky helps make sure your code is clean before committing.
-
-```bash
-npm install
-npx husky install
-npx husky add .husky/pre-commit "pytest && black --check . && flake8"
+### Always generate reports automatically
+Add this to your `pytest.ini`:
+```ini
+[pytest]
+addopts = --html=reports/html/report.html --self-contained-html
 ```
 
-Now, every time you commit, it will check that your tests pass and code is formatted.
+---
+
+## 🧩 Project Structure
+
+```
+playwright_python_framework/
+├─ auth/
+│  └─ storage_state.json
+├─ pages/
+│  └─ signup_page.py
+├─ scripts/
+│  └─ bootstrap_signup.py
+├─ tests/
+│  ├─ test_sample.py
+│  └─ test_signup_and_save_session.py
+├─ .env.example
+├─ conftest.py
+├─ pytest.ini
+├─ requirements.txt
+└─ README.md
+```
 
 ---
 
-### 🚀 You’re Ready!
+## 🧾 .gitignore
 
-Now you can start:
-
-- Writing tests inside the `tests/` folder
-- Creating reusable components in `pages/` using Page Object Model
-- Using data files in `fixtures/data/`
-- Viewing visual regression screenshots in `visual_regression/`
-
----
-
-### 🤖 Common Commands
-
-| Action                    | Command                          |
-|---------------------------|----------------------------------|
-| Run all tests             | `pytest`                         |
-| Run one test file         | `pytest tests/test_signup.py`   |
-| Regenerate login session  | `python utils/save_storage_state.py` |
-| View HTML report          | Open `reports/html/report.html` |
+```
+.env
+auth/storage_state.json
+.pytest_cache/
+__pycache__/
+.venv/
+reports/
+```
 
 ---
 
-> 🔰 This project is beginner-friendly. If you follow the steps above, you’ll be up and running with a professional-grade test framework in minutes — no deep experience needed.
+## 🔗 Handy Commands
+
+```bash
+pytest tests/test_sample.py -vv
+pytest -vv
+python scripts/bootstrap_signup.py --name "Jane Doe" --email "jane@example.com" --password "StrongPass123"
+python scripts/bootstrap_signup.py --force --random-email --name "New User" --password 'NewStrongPass!23'
+pytest -vv --html=reports/html/report.html --self-contained-html
+```
+
+---
+
+**You’re set!**
